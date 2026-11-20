@@ -1,0 +1,7 @@
+Method,Name,Error,Occurrences
+POST,heavy-batch,CatchResponseError('stream backend_error'),2
+POST,support-bot,CatchResponseError('stream backend_error'),8
+POST,summarizer,CatchResponseError('stream backend_error'),9
+POST,support-bot,CatchResponseError('502 backend_error'),386
+POST,heavy-batch,CatchResponseError('502 backend_error'),49
+POST,summarizer,CatchResponseError('502 backend_error'),136

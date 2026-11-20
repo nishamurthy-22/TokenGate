@@ -1,0 +1,4 @@
+Method,Name,Error,Occurrences
+POST,heavy-batch,CatchResponseError('stream backend_error'),5
+POST,support-bot,CatchResponseError('stream backend_error'),9
+POST,summarizer,CatchResponseError('stream backend_error'),9
