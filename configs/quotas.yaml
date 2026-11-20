@@ -1,0 +1,11 @@
+# Token bucket per application: capacity = maximum burst, refill_per_sec = sustained rate.
+apps:
+  support-bot:
+    capacity: 20000
+    refill_per_sec: 500
+  summarizer:
+    capacity: 50000
+    refill_per_sec: 1000
+  heavy-batch:
+    capacity: 20000
+    refill_per_sec: 500
