@@ -1,0 +1,16 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  # Finds every gateway replica through Docker's DNS.
+  - job_name: gateway
+    dns_sd_configs:
+      - names: [gateway]
+        type: A
+        port: 8000
+        refresh_interval: 10s
+
+  - job_name: mock_backend
+    static_configs:
+      - targets: ["backend-fast:9000", "backend-slow:9000"]

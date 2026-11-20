@@ -1,0 +1,95 @@
+# Local TokenGate system. Start it from the repository root with `make up`.
+# Settings can be changed with environment variables, for example:
+#   GATEWAYS=4 POLICY=round_robin make up
+name: tokengate
+
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "6379:6379"   # exposed so the rate-limit benchmark can run from the host
+
+  backend-fast:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.mockbackend
+    environment:
+      MOCK_ID: backend-fast
+      TOKENS_PER_SEC: ${FAST_TOKENS_PER_SEC:-100}
+      TTFT_MS: ${FAST_TTFT_MS:-150}
+      MAX_CONCURRENCY: 64
+      MAX_QUEUE: 256
+      SEED: 1
+    ports:
+      - "9001:9000"   # fault injection: curl -X POST localhost:9001/admin/fail?mode=error
+
+  backend-slow:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.mockbackend
+    environment:
+      MOCK_ID: backend-slow
+      TOKENS_PER_SEC: ${SLOW_TOKENS_PER_SEC:-25}
+      TTFT_MS: ${SLOW_TTFT_MS:-400}
+      MAX_CONCURRENCY: 64
+      MAX_QUEUE: 256
+      SEED: 2
+    ports:
+      - "9002:9000"
+
+  gateway:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.gateway
+    environment:
+      POLICY: ${POLICY:-least_tokens}
+      LIMITER: ${LIMITER:-redis}
+      FAIL_MODE: ${FAIL_MODE:-fail_closed}
+      REDIS_ADDR: redis:6379
+      GATEWAY_COUNT: ${GATEWAYS:-2}
+      HEALTH_CHECKS: ${HEALTH_CHECKS:-true}
+      MAX_RETRIES: ${MAX_RETRIES:-1}
+      CLOCK_SOURCE: ${CLOCK_SOURCE:-redis}
+      CLOCK_SKEW_MS: ${CLOCK_SKEW_MS:-0}
+      QUOTAS_FILE: ${QUOTAS_FILE:-configs/quotas.yaml}
+    deploy:
+      replicas: ${GATEWAYS:-2}
+    expose:
+      - "8000"
+    depends_on:
+      - redis
+      - backend-fast
+      - backend-slow
+
+  lb:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "8080:80"
+    depends_on:
+      - gateway
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    volumes:
+      - ../../observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - gateway
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    volumes:
+      - ../../observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../../observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
