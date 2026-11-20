@@ -1,0 +1,6 @@
+# Backends every gateway routes to. IDs appear in metrics and X-Backend-ID.
+backends:
+  - id: backend-fast
+    url: http://backend-fast:9000
+  - id: backend-slow
+    url: http://backend-slow:9000

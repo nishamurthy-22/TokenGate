@@ -18,33 +18,63 @@ This is the final project for our distributed systems course at Northeastern Uni
 
 | Path | Contents |
 |---|---|
-| `cmd/gateway`, `cmd/mockbackend` | Entry points for the two programs |
+| `cmd/gateway`, `cmd/mockbackend` | Entry points for the gateway and the mock LLM backend |
+| `cmd/rlbench` | Benchmark for rate-limiter overshoot under concurrency |
 | `internal/api` | Request, response and streaming formats shared by all components |
-| `internal/gateway` | HTTP server, request handling, streaming proxy |
+| `internal/gateway` | HTTP server, request handling, streaming proxy, retries |
 | `internal/routing` | Backend pool and routing policies |
-| `internal/health` | Health checks and circuit breakers |
-| `internal/ratelimit` | Token budgets in Redis (Lua scripts), local variant, fail modes |
+| `internal/health` | Active health checks |
+| `internal/ratelimit` | Token budgets: atomic Redis (Lua scripts), naive Redis, local, fail modes |
 | `internal/mock` | Mock LLM backend with fault injection |
 | `internal/metrics` | Prometheus metric definitions |
 | `internal/config` | Configuration loading |
-| `configs` | YAML configuration files |
-| `deploy` | Dockerfiles, Docker Compose, AWS scripts |
+| `configs` | Backends and per-application quotas |
+| `deploy` | Dockerfiles and Docker Compose |
 | `observability` | Prometheus and Grafana configuration |
 | `loadtest` | Locust workloads |
-| `experiments` | Experiment runner, configs, results and analysis |
+| `experiments` | Experiment scripts and results |
 | `docs` | Design contracts and reports |
 
 ## Getting started
 
-Requirements: Go (version in `go.mod`), Docker with Docker Compose, Python 3 for Locust.
+Requirements: Go (version in `go.mod`), Docker with Docker Compose, Python 3.
 
 ```bash
-make help     # list all commands
-make check    # format check, vet and tests (same as CI)
-make build    # build both binaries into ./bin
+make tidy                               # first time only: download dependencies
+make check                              # format check, vet and tests (same as CI)
+make up                                 # start the whole system (2 gateways)
+pip install -r loadtest/requirements.txt
+make loadtest                           # Locust web UI on http://localhost:8089
+make down
 ```
 
-Running the full system with `make up` will be available once the Compose file is added.
+Try one request by hand:
+
+```bash
+curl -N http://localhost:8080/v1/chat/completions \
+  -H 'Content-Type: application/json' -H 'X-App-ID: support-bot' \
+  -d '{"messages":[{"role":"user","content":"hello"}],"max_tokens":10}'
+```
+
+| Service | Address |
+|---|---|
+| Gateways (through nginx) | http://localhost:8080 |
+| Grafana dashboard | http://localhost:3000 |
+| Prometheus | http://localhost:9090 |
+| Mock backends (fault injection) | http://localhost:9001, http://localhost:9002 |
+
+Change settings with environment variables, for example `make up GATEWAYS=4 POLICY=round_robin`. All settings are listed in [docs/DESIGN.md](docs/DESIGN.md), section 8.
+
+## Experiments
+
+```bash
+make experiment EXP=exp1_scaling     # 1 vs 2 gateway replicas
+make experiment EXP=exp2_routing     # round robin vs least requests vs least tokens
+make experiment EXP=exp3_ratelimit   # overshoot: naive vs atomic Redis limiter
+make experiment EXP=exp4_faults      # backend failure with and without health checks and retries
+```
+
+Results are saved under `experiments/<experiment>/results/`.
 
 ## How we work
 

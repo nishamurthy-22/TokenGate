@@ -1,0 +1,12 @@
+# Very large budgets, so that budgets never reject requests. Used by the
+# scaling and routing experiments, which measure throughput and latency, not limits.
+apps:
+  support-bot:
+    capacity: 1000000000
+    refill_per_sec: 1000000000
+  summarizer:
+    capacity: 1000000000
+    refill_per_sec: 1000000000
+  heavy-batch:
+    capacity: 1000000000
+    refill_per_sec: 1000000000
